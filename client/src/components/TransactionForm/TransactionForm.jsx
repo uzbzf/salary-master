@@ -1,153 +1,145 @@
-import { useState, useEffect } from 'react';
-import { addIncome, updateIncome } from '../../services/incomeService.js';
-import { addExpense, updateExpense } from '../../services/expenseService.js';
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '../../utils/constants.js';
-import styles from './TransactionForm.module.css';
+import React, { useState, useEffect } from "react";
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "../../utils/constants";
 
-export default function TransactionForm({ transaction = null, type = 'expense', onSuccess, onCancel }) {
-  // Если передан transaction, это режим редактирования
-  const isEditing = !!transaction;
-  
-  const [formData, setFormData] = useState({
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
-    category: '',
-    comment: '',
-    isRecurring: false
-  });
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+function TransactionForm({ onSubmit, onCancel, editData }) {
+  // Тип операции: income или expense
+  const [type, setType] = useState(editData?.type || "expense");
 
-  // Заполняем форму данными для редактирования
+  // Поля формы
+  const [amount, setAmount] = useState(editData?.amount || "");
+  const [date, setDate] = useState(
+    editData?.date || new Date().toISOString().split("T")[0],
+  );
+  const [category, setCategory] = useState(editData?.category || "");
+  const [comment, setComment] = useState(editData?.comment || "");
+  const [isRecurring, setIsRecurring] = useState(
+    editData?.isRecurring || false,
+  );
+
+  // При смене типа операции сбрасываем категорию на первую из списка
   useEffect(() => {
-    if (transaction) {
-      setFormData({
-        amount: transaction.amount || '',
-        date: transaction.date || new Date().toISOString().split('T')[0],
-        category: transaction.category || '',
-        comment: transaction.comment || '',
-        isRecurring: transaction.isRecurring || false
-      });
+    const categories =
+      type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    if (!category || !categories.find((c) => c.id === category)) {
+      setCategory(categories[0]?.id || "");
     }
-  }, [transaction]);
+  }, [type]);
 
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  // Получаем список категорий для текущего типа
+  const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
+  // Обработка отправки формы
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
 
-    try {
-      const data = {
-        ...formData,
-        amount: Number(formData.amount)
-      };
-
-      let result;
-      
-      if (isEditing) {
-        // Режим редактирования
-        if (type === 'income') {
-          result = await updateIncome(transaction.id, data);
-        } else {
-          result = await updateExpense(transaction.id, data);
-        }
-      } else {
-        // Режим создания
-        if (type === 'income') {
-          result = await addIncome(data);
-        } else {
-          result = await addExpense(data);
-        }
-      }
-
-      // Уведомляем родительский компонент об успехе
-      if (onSuccess) {
-        onSuccess(result);
-      }
-
-      // Сбрасываем форму только если это не редактирование
-      if (!isEditing) {
-        setFormData({
-          amount: '',
-          date: new Date().toISOString().split('T')[0],
-          category: '',
-          comment: '',
-          isRecurring: false
-        });
-      }
-    } catch (err) {
-      console.error('Ошибка при сохранении:', err);
-      setError(err.message || 'Произошла ошибка при сохранении операции');
-    } finally {
-      setLoading(false);
+    // Простая валидация
+    if (!amount || Number(amount) <= 0) {
+      alert("Введите корректную сумму");
+      return;
     }
+
+    if (!date) {
+      alert("Выберите дату");
+      return;
+    }
+
+    if (!category) {
+      alert("Выберите категорию");
+      return;
+    }
+
+    // Формируем объект данных
+    const data = {
+      type,
+      amount: Number(amount),
+      date,
+      category,
+      comment: comment.trim(),
+    };
+
+    // Для расходов добавляем признак регулярности
+    if (type === "expense") {
+      data.isRecurring = isRecurring;
+    }
+
+    onSubmit(data);
   };
 
   return (
-    <form onSubmit={handleSubmit} className={styles.form}>
-      <h2 className={styles.title}>
-        {isEditing ? 'Редактировать операцию' : `Добавить ${type === 'income' ? 'доход' : 'расход'}`}
-      </h2>
+    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+      {/* Переключатель типа операции */}
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+        <button
+          type="button"
+          onClick={() => setType("income")}
+          className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 sm:text-base ${
+            type === "income"
+              ? "bg-success text-white shadow-card"
+              : "text-secondary hover:bg-surface/60 hover:text-text"
+          }`}
+        >
+          💰 Доход
+        </button>
 
-      {error && <div className={styles.error}>{error}</div>}
-
-      <div className={styles.field}>
-        <label htmlFor="amount" className={styles.label}>
-          Сумма
-        </label>
-        <input
-          type="number"
-          id="amount"
-          name="amount"
-          value={formData.amount}
-          onChange={handleChange}
-          required
-          min="0.01"
-          step="0.01"
-          className={styles.input}
-          placeholder="Введите сумму"
-        />
+        <button
+          type="button"
+          onClick={() => setType("expense")}
+          className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 sm:text-base ${
+            type === "expense"
+              ? "bg-danger text-white shadow-card"
+              : "text-secondary hover:bg-surface/60 hover:text-text"
+          }`}
+        >
+          💸 Расход
+        </button>
       </div>
 
-      <div className={styles.field}>
-        <label htmlFor="date" className={styles.label}>
-          Дата
-        </label>
-        <input
-          type="date"
-          id="date"
-          name="date"
-          value={formData.date}
-          onChange={handleChange}
-          required
-          className={styles.input}
-        />
+      {/* Сумма и дата */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text" htmlFor="amount">
+            Сумма
+          </label>
+          <input
+            id="amount"
+            type="number"
+            className="field"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Например, 150 000"
+            min="0"
+            step="1"
+            required
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text" htmlFor="date">
+            Дата
+          </label>
+          <input
+            id="date"
+            type="date"
+            className="field"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
-      <div className={styles.field}>
-        <label htmlFor="category" className={styles.label}>
+      {/* Категория */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text" htmlFor="category">
           Категория
         </label>
         <select
           id="category"
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
+          className="field cursor-pointer"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
           required
-          className={styles.select}
         >
-          <option value="">Выберите категорию</option>
           {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>
               {cat.label}
@@ -156,57 +148,59 @@ export default function TransactionForm({ transaction = null, type = 'expense', 
         </select>
       </div>
 
-      <div className={styles.field}>
-        <label htmlFor="comment" className={styles.label}>
+      {/* Комментарий */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text" htmlFor="comment">
           Комментарий
         </label>
         <textarea
           id="comment"
-          name="comment"
-          value={formData.comment}
-          onChange={handleChange}
-          className={styles.textarea}
-          placeholder="Добавьте комментарий (необязательно)"
-          rows="3"
+          className="field min-h-[70px] resize-y"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Необязательное поле"
+          rows="2"
         />
       </div>
 
-      {type === 'expense' && (
-        <div className={styles.checkboxField}>
+      {/* Чекбокс регулярного расхода (только для расходов) */}
+      {type === "expense" && (
+        <label
+          htmlFor="isRecurring"
+          className="flex cursor-pointer items-center gap-3 rounded-xl bg-surface-muted px-4 py-3 transition-colors duration-300 hover:bg-surface-hover"
+        >
           <input
-            type="checkbox"
             id="isRecurring"
-            name="isRecurring"
-            checked={formData.isRecurring}
-            onChange={handleChange}
-            className={styles.checkbox}
+            type="checkbox"
+            className="size-5 cursor-pointer accent-primary"
+            checked={isRecurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
           />
-          <label htmlFor="isRecurring" className={styles.checkboxLabel}>
-            Регулярный расход
-          </label>
-        </div>
+          <span className="text-sm text-text">Регулярный расход</span>
+        </label>
       )}
 
-      <div className={styles.actions}>
+      {/* Кнопки действий */}
+      <div className="mt-1 flex gap-3">
+        <button
+          type="button"
+          className="btn btn-ghost flex-1 bg-surface-muted"
+          onClick={onCancel}
+        >
+          Отмена
+        </button>
+
         <button
           type="submit"
-          disabled={loading}
-          className={styles.submitBtn}
+          className={`btn flex-1 text-white ${
+            type === "income" ? "bg-success hover:bg-success-hover" : "bg-danger hover:bg-danger-hover"
+          }`}
         >
-          {loading ? 'Сохранение...' : isEditing ? 'Обновить' : 'Добавить'}
+          {editData ? "Сохранить" : "Добавить"}
         </button>
-        
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className={styles.cancelBtn}
-          >
-            Отмена
-          </button>
-        )}
       </div>
     </form>
   );
 }
+
+export default TransactionForm;

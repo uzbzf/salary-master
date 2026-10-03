@@ -1,78 +1,43 @@
-import { getBalance, getByCategory, getByMonth } from '../services/summaryService.js';
+import * as summaryService from '../services/summaryService.js';
 
 /**
- * Получение общего баланса
- * GET /api/v1/summary
+ * Получить общий баланс текущего пользователя
+ * GET /api/v1/summary/balance
  */
-export const getBalanceHandler = async (req, res, next) => {
+export async function getBalance(req, res, next) {
   try {
-    const { startDate, endDate } = req.query;
-
-    const balance = await getBalance(startDate, endDate);
-
-    res.json({
-      data: balance,
-    });
+    const userId = req.user.id;
+    const balance = await summaryService.getBalance(userId);
+    res.json(balance);
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Получение сумм по категориям
+ * Получить сумму по категориям для текущего пользователя
  * GET /api/v1/summary/by-category
  */
-export const getByCategoryHandler = async (req, res, next) => {
+export async function getByCategory(req, res, next) {
   try {
-    const { type = 'expense', startDate, endDate } = req.query;
-
-    // Валидация типа
-    if (type !== 'income' && type !== 'expense') {
-      return res.status(400).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Параметр type должен быть "income" или "expense"',
-        },
-      });
-    }
-
-    const categoryData = await getByCategory(type, startDate, endDate);
-
-    res.json({
-      data: categoryData,
-      type,
-    });
+    const userId = req.user.id;
+    const data = await summaryService.getByCategory(userId, req.query);
+    res.json(data);
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Получение помесячной сводки
+ * Получить помесячную статистику для текущего пользователя
  * GET /api/v1/summary/by-month
  */
-export const getByMonthHandler = async (req, res, next) => {
+export async function getMonthlySummary(req, res, next) {
   try {
-    const { months = 6 } = req.query;
-
-    // Валидация количества месяцев
-    const monthsCount = Number(months);
-    if (isNaN(monthsCount) || monthsCount < 1 || monthsCount > 24) {
-      return res.status(400).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Параметр months должен быть числом от 1 до 24',
-        },
-      });
-    }
-
-    const monthlyData = await getByMonth(monthsCount);
-
-    res.json({
-      data: monthlyData,
-      monthsCount,
-    });
+    const userId = req.user.id;
+    const data = await summaryService.getMonthlySummary(userId, req.query);
+    res.json(data);
   } catch (error) {
     next(error);
   }
-};
+}

@@ -1,67 +1,57 @@
-import * as api from './api.js';
+import { get, post, put, del } from './api.js';
 
 /**
- * Получение списка всех доходов с опциональными фильтрами
- * @param {Object} filters - Объект фильтров (category, startDate, endDate, page, limit)
- * @returns {Promise<Object>} Объект с data (массив доходов) и pagination
+ * Получить все доходы с опциональными фильтрами
+ * @param {Object} filters - параметры фильтрации (page, limit, category, dateFrom, dateTo)
+ * @returns {Promise<Object>} { data: Array, pagination: { total, page, limit } }
  */
-export const getIncomes = async (filters = {}) => {
-  const result = await api.get('/incomes', filters);
+export async function getIncomes(filters = {}) {
+  const response = await get('/incomes', filters);
+  
+  // Адаптируем ответ backend под ожидаемый формат
   return {
-    data: result.data || [],
-    pagination: result.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 },
+    data: response.data || [],
+    pagination: {
+      total: response.total || 0,
+      page: response.page || 1,
+      limit: response.limit || 20,
+    },
   };
-};
+}
 
 /**
- * Получение дохода по ID
- * @param {string} id - Идентификатор дохода
- * @returns {Promise<Object|null>} Объект дохода или null
+ * Получить доход по ID
+ * @param {string} id - идентификатор дохода
+ * @returns {Promise<Object>} объект дохода
  */
-export const getIncomeById = async (id) => {
-  try {
-    const result = await api.get(`/incomes/${id}`);
-    return result.data;
-  } catch (error) {
-    if (error.code === 'NOT_FOUND') {
-      return null;
-    }
-    throw error;
-  }
-};
+export async function getIncomeById(id) {
+  return await get(`/incomes/${id}`);
+}
 
 /**
- * Создание нового дохода
- * @param {Object} incomeData - Данные дохода (amount, date, category, comment)
- * @returns {Promise<Object>} Созданный доход
+ * Добавить новый доход
+ * @param {Object} incomeData - данные дохода { amount, date, category, comment }
+ * @returns {Promise<Object>} созданный доход
  */
-export const addIncome = async (incomeData) => {
-  const result = await api.post('/incomes', incomeData);
-  return result.data;
-};
+export async function addIncome(incomeData) {
+  return await post('/incomes', incomeData);
+}
 
 /**
- * Обновление существующего дохода
- * @param {string} id - Идентификатор дохода
- * @param {Object} incomeData - Новые данные
- * @returns {Promise<Object>} Обновлённый доход
+ * Обновить существующий доход
+ * @param {string} id - идентификатор дохода
+ * @param {Object} incomeData - новые данные дохода
+ * @returns {Promise<Object>} обновлённый доход
  */
-export const updateIncome = async (id, incomeData) => {
-  const result = await api.put(`/incomes/${id}`, incomeData);
-  return result.data;
-};
+export async function updateIncome(id, incomeData) {
+  return await put(`/incomes/${id}`, incomeData);
+}
 
 /**
- * Удаление дохода
- * @param {string} id - Идентификатор дохода
- * @returns {Promise<boolean>} true, если удалён успешно
+ * Удалить доход по ID
+ * @param {string} id - идентификатор дохода
+ * @returns {Promise<void>}
  */
-export const deleteIncome = async (id) => {
-  try {
-    await api.del(`/incomes/${id}`);
-    return true;
-  } catch (error) {
-    console.error('Ошибка при удалении дохода:', error.message);
-    return false;
-  }
-};
+export async function deleteIncome(id) {
+  await del(`/incomes/${id}`);
+}

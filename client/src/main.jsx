@@ -1,13 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
-import { DataProvider } from "./context/DataContext";
-import "./styles/global.css";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
+import "./index.css"; // <-- ЭТА СТРОКА ОБЯЗАТЕЛЬНА
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <DataProvider>
-      <App />
-    </DataProvider>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );

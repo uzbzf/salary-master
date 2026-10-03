@@ -1,97 +1,85 @@
 /**
- * Обёртка для работы с localStorage
- * Предоставляет безопасные методы для чтения, записи и удаления данных
+ * Безопасное получение данных из localStorage
+ * @param {string} key - ключ хранилища
+ * @param {any} defaultValue - значение по умолчанию, если ключ не найден
+ * @returns {any} распарсенные данные или defaultValue
  */
-
-/**
- * Получение данных из localStorage
- * @param {string} key - Ключ для получения данных
- * @param {*} defaultValue - Значение по умолчанию, если данные не найдены
- * @returns {*} Распарсенные данные или значение по умолчанию
- */
-export const storageGet = (key, defaultValue = null) => {
+export const getFromStorage = (key, defaultValue = null) => {
   try {
     const item = localStorage.getItem(key);
     if (item === null) return defaultValue;
     return JSON.parse(item);
   } catch (error) {
-    console.error(`Ошибка при чтении из localStorage (ключ: ${key}):`, error);
+    console.error(`Ошибка чтения из localStorage (ключ: ${key}):`, error);
     return defaultValue;
   }
 };
 
 /**
- * Сохранение данных в localStorage
- * @param {string} key - Ключ для сохранения данных
- * @param {*} value - Данные для сохранения (будут сериализованы в JSON)
- * @returns {boolean} true, если сохранение успешно
+ * Безопасная запись данных в localStorage
+ * @param {string} key - ключ хранилища
+ * @param {any} value - данные для сохранения
+ * @returns {boolean} true, если запись успешна
  */
-export const storageSet = (key, value) => {
+export const setToStorage = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (error) {
-    console.error(`Ошибка при записи в localStorage (ключ: ${key}):`, error);
+    console.error(`Ошибка записи в localStorage (ключ: ${key}):`, error);
     return false;
   }
 };
 
 /**
  * Удаление данных из localStorage
- * @param {string} key - Ключ для удаления
+ * @param {string} key - ключ хранилища
  * @returns {boolean} true, если удаление успешно
  */
-export const storageRemove = (key) => {
+export const removeFromStorage = (key) => {
   try {
     localStorage.removeItem(key);
     return true;
   } catch (error) {
-    console.error(`Ошибка при удалении из localStorage (ключ: ${key}):`, error);
-    return false;
-  }
-};
-
-/**
- * Очистка всего localStorage
- * @returns {boolean} true, если очистка успешна
- */
-export const storageClear = () => {
-  try {
-    localStorage.clear();
-    return true;
-  } catch (error) {
-    console.error('Ошибка при очистке localStorage:', error);
+    console.error(`Ошибка удаления из localStorage (ключ: ${key}):`, error);
     return false;
   }
 };
 
 /**
  * Генерация уникального идентификатора (UUID)
- * @returns {string} Уникальный идентификатор
+ * @returns {string} уникальный ID
  */
-export const generateId = () => {
-  // Используем crypto.randomUUID() если доступен (современные браузеры)
+export const generateUUID = () => {
+  // Используем crypto.randomUUID(), если доступен
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
 
-  // Fallback для старых браузеров
+  // Fallback: генерация UUID v4 вручную
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 };
 
 /**
- * Получение всех ключей из localStorage
- * @returns {string[]} Массив ключей
+ * Очистка всего localStorage
+ * @returns {boolean} true, если очистка успешна
  */
-export const storageKeys = () => {
+export const clearStorage = () => {
   try {
-    return Object.keys(localStorage);
+    localStorage.clear();
+    return true;
   } catch (error) {
-    console.error('Ошибка при получении ключей из localStorage:', error);
-    return [];
+    console.error('Ошибка очистки localStorage:', error);
+    return false;
   }
+};
+
+// Ключи хранилища (константы)
+export const STORAGE_KEYS = {
+  INCOMES: 'incomes',
+  EXPENSES: 'expenses',
 };

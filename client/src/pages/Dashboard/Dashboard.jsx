@@ -1,107 +1,216 @@
-import { useState, useMemo } from 'react';
-import { useData } from '../../context/DataContext.jsx';
-import Modal from '../../components/Modal/Modal.jsx';
-import TransactionForm from '../../components/TransactionForm/TransactionForm.jsx';
-import BalanceCard from '../../components/BalanceCard/BalanceCard.jsx';
-import TransactionList from '../../components/TransactionList/TransactionList.jsx';
-import { Link } from 'react-router-dom';
-import styles from './Dashboard.module.css';
+import React, { useState, useEffect } from "react";
+import BalanceCard from "../../components/BalanceCard/BalanceCard";
+import TransactionList from "../../components/TransactionList/TransactionList";
+import TransactionForm from "../../components/TransactionForm/TransactionForm";
+import Modal from "../../components/Modal/Modal";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
+import {
+  getBalance,
+  getIncomes,
+  getExpenses,
+  createIncome,
+  createExpense,
+  deleteIncome,
+  deleteExpense,
+} from "../../services/transactionService";
 
-export default function Dashboard() {
-  const { incomes, expenses, isLoading, deleteTransaction } = useData();
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState('expense');
+function Dashboard() {
+  const [balance, setBalance] = useState({
+    totalIncome: 0,
+    totalExpense: 0,
+    balance: 0,
+  });
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const totalIncome = useMemo(() => {
-    return (incomes || []).reduce((sum, item) => sum + Number(item.amount), 0);
-  }, [incomes]);
+  // Загрузка данных
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [balanceData, incomesData, expensesData] = await Promise.all([
+        getBalance(),
+        getIncomes({ limit: 5 }),
+        getExpenses({ limit: 5 }),
+      ]);
 
-  const totalExpense = useMemo(() => {
-    return (expenses || []).reduce((sum, item) => sum + Number(item.amount), 0);
-  }, [expenses]);
+      setBalance(balanceData);
 
-  const balance = totalIncome - totalExpense;
+      // Объединяем доходы и расходы, сортируем по дате
+      const allTransactions = [
+        ...(incomesData.data || []),
+        ...(expensesData.data || []),
+      ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const recentTransactions = useMemo(() => {
-    const combined = [
-      ...(incomes || []).map((item) => ({ ...item, type: 'income' })),
-      ...(expenses || []).map((item) => ({ ...item, type: 'expense' }))
-    ];
-    return combined
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5);
-  }, [incomes, expenses]);
-
-  const openAddIncome = () => {
-    setModalType('income');
-    setIsModalOpen(true);
+      setRecentTransactions(allTransactions.slice(0, 5));
+    } catch (error) {
+      console.error("Ошибка загрузки данных:", error);
+      alert("Не удалось загрузить данные");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const openAddExpense = () => {
-    setModalType('expense');
-    setIsModalOpen(true);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Обработка добавления/редактирования
+  const handleSubmit = async (data) => {
+    try {
+      if (editingTransaction) {
+        // Редактирование (пока не реализовано в этом упрощённом варианте)
+        alert("Редактирование пока не поддерживается на главной странице");
+        return;
+      }
+
+      if (data.type === "income") {
+        await createIncome(data);
+      } else {
+        await createExpense(data);
+      }
+
+      setIsFormOpen(false);
+      setEditingTransaction(null);
+      await loadData();
+    } catch (error) {
+      console.error("Ошибка сохранения:", error);
+      alert(error.message || "Не удалось сохранить операцию");
+    }
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-  };
+  // Обработка удаления
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
 
-  const handleFormSuccess = () => {
-    setIsModalOpen(false);
-  };
+    try {
+      if (deleteConfirm.type === "income") {
+        await deleteIncome(deleteConfirm.id);
+      } else {
+        await deleteExpense(deleteConfirm.id);
+      }
 
-  const handleDelete = async (transaction) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту операцию?')) {
-      await deleteTransaction(transaction.id, transaction.type);
+      setDeleteConfirm(null);
+      await loadData();
+    } catch (error) {
+      console.error("Ошибка удаления:", error);
+      alert("Не удалось удалить операцию");
     }
   };
 
   if (isLoading) {
-    return <div className={styles.loading}>Загрузка данных...</div>;
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-secondary">
+        <span className="size-9 animate-spin rounded-full border-[3px] border-border border-t-primary" />
+        <p className="animate-shimmer text-sm">Загрузка данных...</p>
+      </div>
+    );
   }
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Главная</h1>
-        <div className={styles.actions}>
-          <button onClick={openAddIncome} className={`${styles.btn} ${styles.btnIncome}`}>
-            + Доход
-          </button>
-          <button onClick={openAddExpense} className={`${styles.btn} ${styles.btnExpense}`}>
-            + Расход
-          </button>
-        </div>
-      </div>
-      
-      <div className={styles.cardsGrid}>
-        <BalanceCard title="Баланс" amount={balance} color="balance" />
-        <BalanceCard title="Доходы" amount={totalIncome} color="income" />
-        <BalanceCard title="Расходы" amount={totalExpense} color="expense" />
-      </div>
+    <div className="flex flex-col gap-8">
+      <h1 className="page-title">Главная</h1>
 
-      <div className={styles.recentSection}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Последние операции</h2>
-          <Link to="/history" className={styles.link}>
-            Смотреть все →
-          </Link>
-        </div>
-        <TransactionList 
-          transactions={recentTransactions} 
-          showDelete={true} 
-          onDelete={handleDelete} 
+      {/* Карточки баланса */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <BalanceCard
+          title="Доходы"
+          amount={balance.totalIncome}
+          color="var(--success)"
+        />
+        <BalanceCard
+          title="Расходы"
+          amount={balance.totalExpense}
+          color="var(--danger)"
+        />
+        <BalanceCard
+          title="Баланс"
+          amount={balance.balance}
+          color="var(--primary)"
         />
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-        <TransactionForm 
-          type={modalType} 
-          onSuccess={handleFormSuccess} 
-          onCancel={handleCloseModal} 
+      {/* Последние операции */}
+      <section className="card animate-rise p-5 sm:p-6" style={{ animationDelay: "120ms" }}>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-lg font-bold tracking-tight text-text">
+            Последние операции
+          </h2>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTransaction(null);
+              setIsFormOpen(true);
+            }}
+            className="btn btn-primary hidden px-3.5 py-2 text-sm sm:inline-flex"
+          >
+            + Добавить
+          </button>
+        </div>
+
+        {recentTransactions.length > 0 ? (
+          <TransactionList
+            transactions={recentTransactions}
+            onDelete={(transaction) => setDeleteConfirm(transaction)}
+            onEdit={(transaction) => {
+              setEditingTransaction(transaction);
+              setIsFormOpen(true);
+            }}
+          />
+        ) : (
+          <div className="animate-fade-in rounded-2xl border-2 border-dashed border-border px-6 py-12 text-center">
+            <p className="mb-1 font-medium text-secondary">
+              Операций пока нет
+            </p>
+            <p className="text-sm text-secondary/70">
+              Нажмите кнопку «+», чтобы добавить первую операцию
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Кнопка добавления (FAB) */}
+      <button
+        type="button"
+        onClick={() => {
+          setEditingTransaction(null);
+          setIsFormOpen(true);
+        }}
+        title="Добавить операцию"
+        aria-label="Добавить операцию"
+        className="fixed bottom-6 right-6 z-40 grid size-14 place-items-center rounded-full bg-primary text-3xl font-light text-on-primary shadow-pop transition-all duration-300 hover:scale-110 hover:bg-primary-hover active:scale-95 sm:size-15"
+      >
+        +
+      </button>
+
+      {/* Модальное окно формы */}
+      {isFormOpen && (
+        <Modal onClose={() => setIsFormOpen(false)}>
+          <TransactionForm
+            onSubmit={handleSubmit}
+            onCancel={() => {
+              setIsFormOpen(false);
+              setEditingTransaction(null);
+            }}
+            editData={editingTransaction}
+          />
+        </Modal>
+      )}
+
+      {/* Диалог подтверждения удаления */}
+      {deleteConfirm && (
+        <ConfirmDialog
+          title="Удалить операцию?"
+          message="Вы уверены, что хотите удалить эту операцию? Это действие нельзя отменить."
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteConfirm(null)}
         />
-      </Modal>
+      )}
     </div>
   );
 }
+
+export default Dashboard;

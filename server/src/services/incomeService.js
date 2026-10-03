@@ -2,111 +2,156 @@ import crypto from 'crypto';
 import { getDb } from '../db/connection.js';
 
 /**
- * Получение всех доходов с опциональными фильтрами и пагинацией
+ * Преобразует строку базы данных (snake_case) в объект (camelCase)
+ * @param {Object} row - строка из БД
+ * @returns {Object} объект в camelCase
  */
-export const getAllIncomes = async (options = {}) => {
-  const { category, startDate, endDate, page = 1, limit = 20 } = options;
+function mapRowToIncome(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    type: 'income',
+    amount: row.amount,
+    date: row.date,
+    category: row.category,
+    comment: row.comment,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Получить все доходы с пагинацией и фильтрами для конкретного пользователя
+ * @param {string} userId - идентификатор пользователя
+ * @param {Object} options - параметры запроса (page, limit, category, dateFrom, dateTo)
+ * @returns {Promise<Object>} { data: Array, total: number, page: number, limit: number }
+ */
+export async function getAllIncomes(userId, options = {}) {
   const db = getDb();
-
-  let result = db.data.incomes;
-
-  // Фильтрация
-  if (category) {
-    result = result.filter((item) => item.category === category);
-  }
-  if (startDate) {
-    result = result.filter((item) => item.date >= startDate);
-  }
-  if (endDate) {
-    result = result.filter((item) => item.date <= endDate);
-  }
-
-  // Сортировка: новые даты первыми
-  result.sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
-
-  const total = result.length;
+  const page = Math.max(1, Number(options.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(options.limit) || 20));
   const offset = (page - 1) * limit;
-  const data = result.slice(offset, offset + limit);
+
+  // Обязательно фильтруем по user_id
+  const conditions = ['user_id = ?'];
+  const params = [userId];
+
+  if (options.category) {
+    conditions.push('category = ?');
+    params.push(options.category);
+  }
+  if (options.dateFrom) {
+    conditions.push('date >= ?');
+    params.push(options.dateFrom);
+  }
+  if (options.dateTo) {
+    conditions.push('date <= ?');
+    params.push(options.dateTo);
+  }
+
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+  // Получаем общее количество записей пользователя
+  const countRow = await db.get(`SELECT COUNT(*) as total FROM incomes ${whereClause}`, params);
+  const total = countRow.total;
+
+  // Получаем данные с пагинацией
+  const rows = await db.all(
+    `SELECT * FROM incomes ${whereClause} ORDER BY date DESC, created_at DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
 
   return {
-    data,
-    pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    data: rows.map(mapRowToIncome),
+    total,
+    page,
+    limit,
   };
-};
+}
 
 /**
- * Получение дохода по ID
+ * Получить доход по ID для конкретного пользователя
+ * @param {string} userId - идентификатор пользователя
+ * @param {string} id - идентификатор дохода
+ * @returns {Promise<Object|null>} объект дохода или null
  */
-export const getIncomeById = async (id) => {
+export async function getIncomeById(userId, id) {
   const db = getDb();
-  return db.data.incomes.find((item) => item.id === id) || null;
-};
+  const row = await db.get('SELECT * FROM incomes WHERE id = ? AND user_id = ?', [id, userId]);
+  return mapRowToIncome(row);
+}
 
 /**
- * Создание нового дохода
+ * Создать новый доход для конкретного пользователя
+ * @param {string} userId - идентификатор пользователя
+ * @param {Object} data - данные дохода { amount, date, category, comment }
+ * @returns {Promise<Object>} созданный доход
  */
-export const createIncome = async (data) => {
+export async function createIncome(userId, data) {
   const db = getDb();
+  const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  
-  const newIncome = {
-    id: crypto.randomUUID(),
-    amount: Number(data.amount),
-    date: data.date,
-    category: data.category,
-    comment: data.comment || '',
-    createdAt: now,
-    updatedAt: now,
-  };
 
-  db.data.incomes.push(newIncome);
-  await db.write(); // Сохраняем изменения в файл
+  await db.run(
+    `INSERT INTO incomes (id, user_id, amount, date, category, comment, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      userId,
+      Number(data.amount),
+      data.date,
+      data.category,
+      data.comment || '',
+      now,
+      now,
+    ]
+  );
 
-  return newIncome;
-};
+  return getIncomeById(userId, id);
+}
 
 /**
- * Обновление существующего дохода
+ * Обновить существующий доход для конкретного пользователя
+ * @param {string} userId - идентификатор пользователя
+ * @param {string} id - идентификатор дохода
+ * @param {Object} data - новые данные { amount, date, category, comment }
+ * @returns {Promise<Object|null>} обновлённый доход или null, если не найден
  */
-export const updateIncome = async (id, data) => {
+export async function updateIncome(userId, id, data) {
   const db = getDb();
-  const index = db.data.incomes.findIndex((item) => item.id === id);
-  
-  if (index === -1) return null;
+
+  // Проверяем, существует ли запись и принадлежит ли она пользователю
+  const existing = await getIncomeById(userId, id);
+  if (!existing) return null;
 
   const now = new Date().toISOString();
-  const existing = db.data.incomes[index];
 
-  db.data.incomes[index] = {
-    ...existing,
-    amount: data.amount !== undefined ? Number(data.amount) : existing.amount,
-    date: data.date !== undefined ? data.date : existing.date,
-    category: data.category !== undefined ? data.category : existing.category,
-    comment: data.comment !== undefined ? data.comment : existing.comment,
-    updatedAt: now,
-  };
+  await db.run(
+    `UPDATE incomes
+     SET amount = ?, date = ?, category = ?, comment = ?, updated_at = ?
+     WHERE id = ? AND user_id = ?`,
+    [
+      Number(data.amount ?? existing.amount),
+      data.date ?? existing.date,
+      data.category ?? existing.category,
+      data.comment ?? existing.comment,
+      now,
+      id,
+      userId,
+    ]
+  );
 
-  await db.write();
-  return db.data.incomes[index];
-};
+  return getIncomeById(userId, id);
+}
 
 /**
- * Удаление дохода
+ * Удалить доход по ID для конкретного пользователя
+ * @param {string} userId - идентификатор пользователя
+ * @param {string} id - идентификатор дохода
+ * @returns {Promise<boolean>} true, если удаление успешно
  */
-export const deleteIncome = async (id) => {
+export async function deleteIncome(userId, id) {
   const db = getDb();
-  const initialLength = db.data.incomes.length;
-  
-  db.data.incomes = db.data.incomes.filter((item) => item.id !== id);
-  
-  if (db.data.incomes.length < initialLength) {
-    await db.write();
-    return true;
-  }
-  return false;
-};
+  const result = await db.run('DELETE FROM incomes WHERE id = ? AND user_id = ?', [id, userId]);
+  return result.changes > 0;
+}

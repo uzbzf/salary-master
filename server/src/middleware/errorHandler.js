@@ -1,55 +1,47 @@
 /**
  * Централизованный обработчик ошибок Express
- * Форматирует все ошибки в единый формат ответа
+ * Перехватывает все ошибки и возвращает ответ в едином формате
+ * @param {Error} err - объект ошибки
+ * @param {Object} req - объект запроса Express
+ * @param {Object} res - объект ответа Express
+ * @param {Function} next - функция next() Express
  */
+export function errorHandler(err, req, res, next) {
+  // Логируем ошибку в консоль для отладки
+  console.error('❌ Ошибка:', {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+  });
 
-export const errorHandler = (err, req, res, next) => {
-  // Логируем ошибку для отладки
-  console.error('❌ Ошибка:', err.message);
-  console.error(err.stack);
+  // Определяем HTTP-статус (по умолчанию 500 - внутренняя ошибка сервера)
+  const statusCode = err.statusCode || err.status || 500;
 
-  // Определяем статус-код и сообщение
-  let statusCode = err.statusCode || 500;
-  let errorCode = err.errorCode || 'INTERNAL_ERROR';
-  let message = err.message || 'Внутренняя ошибка сервера';
+  // Определяем код ошибки (для клиентской логики)
+  const errorCode = err.code || 'INTERNAL_ERROR';
 
-  // Обработка специфичных типов ошибок
-  if (err.name === 'SyntaxError' && 'body' in err) {
-    statusCode = 400;
-    errorCode = 'INVALID_JSON';
-    message = 'Некорректный формат JSON в теле запроса';
-  }
+  // Формируем сообщение ошибки
+  const message = err.message || 'Произошла внутренняя ошибка сервера';
 
-  // Формируем ответ
+  // Отправляем ответ в едином формате
   res.status(statusCode).json({
     error: {
       code: errorCode,
       message: message,
     },
   });
-};
+}
 
 /**
  * Обработчик для несуществующих маршрутов (404)
+ * @param {Object} req - объект запроса Express
+ * @param {Object} res - объект ответа Express
+ * @param {Function} next - функция next() Express
  */
-export const notFoundHandler = (req, res) => {
-  res.status(404).json({
-    error: {
-      code: 'NOT_FOUND',
-      message: `Маршрут ${req.method} ${req.path} не найден`,
-    },
-  });
-};
-
-/**
- * Создание кастомной ошибки с дополнительными свойствами
- * @param {string} message - Сообщение об ошибке
- * @param {number} statusCode - HTTP статус-код
- * @param {string} errorCode - Код ошибки для фронтенда
- */
-export const createError = (message, statusCode = 500, errorCode = 'INTERNAL_ERROR') => {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  error.errorCode = errorCode;
-  return error;
-};
+export function notFoundHandler(req, res, next) {
+  const error = new Error(`Маршрут не найден: ${req.method} ${req.path}`);
+  error.statusCode = 404;
+  error.code = 'NOT_FOUND';
+  next(error);
+}

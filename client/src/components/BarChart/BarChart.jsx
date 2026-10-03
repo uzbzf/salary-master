@@ -9,120 +9,96 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useTheme } from "../../context/ThemeContext";
+import { ChartPlaceholder, ChartTooltip } from "../ChartShared/ChartShared";
 
-// Заглушка для пустых данных
-const EmptyChart = () => (
-  <div
-    style={{
-      width: "100%",
-      height: "100%",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      color: "var(--color-text-muted)",
-      textAlign: "center",
-      padding: "var(--spacing-xl)",
-    }}
-  >
-    <div style={{ fontSize: "48px", marginBottom: "var(--spacing-md)" }}>
-      📈
-    </div>
-    <p style={{ fontSize: "var(--font-size-md)", fontWeight: 500 }}>
-      Нет данных для отображения
-    </p>
-    <p
-      style={{
-        fontSize: "var(--font-size-sm)",
-        marginTop: "var(--spacing-xs)",
-      }}
-    >
-      Добавьте операции, чтобы увидеть график
-    </p>
-  </div>
-);
-
-// Кастомный tooltip
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div
-        style={{
-          backgroundColor: "var(--color-surface)",
-          padding: "var(--spacing-md)",
-          borderRadius: "var(--radius-md)",
-          boxShadow: "var(--shadow-md)",
-          border: "1px solid var(--color-border)",
-        }}
-      >
-        <p
-          style={{
-            fontWeight: 600,
-            color: "var(--color-text)",
-            marginBottom: "var(--spacing-xs)",
-          }}
-        >
-          {label}
-        </p>
-        {(payload || []).map((entry, index) => {
-          const formattedValue = new Intl.NumberFormat("ru-RU").format(
-            entry.value,
-          );
-          return (
-            <p
-              key={index}
-              style={{
-                color: entry.color,
-                fontSize: "var(--font-size-sm)",
-                margin: "var(--spacing-xs) 0",
-              }}
-            >
-              {entry.name}: {formattedValue} ₽
-            </p>
-          );
-        })}
-      </div>
-    );
+// Форматирование Y-оси
+function formatYAxis(value) {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
   }
-  return null;
-};
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return value;
+}
 
-function BarChart({ data = [], title }) {
+function BarChart({ data }) {
+  const { isDark } = useTheme();
+  const textColor = isDark ? "#94a3b8" : "#64748b";
+  const gridColor = isDark ? "#24334d" : "#e6ebf3";
+
   // Если данных нет — показываем заглушку
   if (!data || data.length === 0) {
-    return <EmptyChart />;
+    return (
+      <ChartPlaceholder icon="📈" text="Данные для графика отсутствуют" />
+    );
   }
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <RechartsBarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+    // key по теме перерисовывает график с анимацией при смене темы
+    <ResponsiveContainer
+      width="100%"
+      height={320}
+      key={isDark ? "dark" : "light"}
+    >
+      <RechartsBarChart
+        data={data}
+        margin={{ top: 16, right: 12, left: 4, bottom: 4 }}
+      >
+        <CartesianGrid
+          strokeDasharray="4 6"
+          stroke={gridColor}
+          vertical={false}
+        />
+
         <XAxis
           dataKey="month"
-          stroke="var(--color-text-muted)"
-          style={{ fontSize: "var(--font-size-sm)" }}
+          stroke={textColor}
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
         />
         <YAxis
-          stroke="var(--color-text-muted)"
-          style={{ fontSize: "var(--font-size-sm)" }}
+          stroke={textColor}
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+          width={48}
+          tickFormatter={formatYAxis}
         />
-        <Tooltip content={<CustomTooltip />} />
+
+        <Tooltip
+          content={<ChartTooltip />}
+          cursor={{ fill: isDark ? "#17233b" : "#eef2f8", radius: 8 }}
+        />
+
         <Legend
           verticalAlign="top"
-          height={36}
-          wrapperStyle={{ fontSize: "var(--font-size-sm)" }}
+          height={40}
+          iconType="circle"
+          formatter={(value) => (
+            <span style={{ color: textColor, fontSize: 13 }}>{value}</span>
+          )}
         />
+
         <Bar
           dataKey="income"
           name="Доходы"
-          fill="var(--color-income)"
+          fill="#10b981"
           radius={[8, 8, 0, 0]}
+          maxBarSize={34}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Bar
           dataKey="expense"
           name="Расходы"
-          fill="var(--color-expense)"
+          fill="#ef4444"
           radius={[8, 8, 0, 0]}
+          maxBarSize={34}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </RechartsBarChart>
     </ResponsiveContainer>

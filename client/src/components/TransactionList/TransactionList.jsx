@@ -1,98 +1,123 @@
-import { useState } from 'react';
-import { deleteIncome } from '../../services/incomeService.js';
-import { deleteExpense } from '../../services/expenseService.js';
-import styles from './TransactionList.module.css';
+import React from "react";
+import {
+  INCOME_CATEGORIES,
+  EXPENSE_CATEGORIES,
+  CATEGORY_ICONS,
+} from "../../utils/constants";
+import { formatTransactionAmount, formatDate } from "../../utils/formatters";
 
-// Функция форматирования даты
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-};
+/**
+ * Получить русское название категории по ID и типу операции
+ * @param {string} categoryId - ID категории (например, 'salary')
+ * @param {string} type - тип операции ('income' или 'expense')
+ * @returns {string} русское название (например, 'Зарплата')
+ */
+function getCategoryLabel(categoryId, type) {
+  const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const category = (categories || []).find((cat) => cat.id === categoryId);
+  return category?.label || "Прочее";
+}
 
-// Функция форматирования суммы
-const formatAmount = (amount, type) => {
-  const formatted = new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0
-  }).format(amount);
-  
-  return type === 'expense' ? `-${formatted}` : `+${formatted}`;
-};
+/**
+ * Получить иконку для категории
+ * @param {string} categoryId - ID категории
+ * @returns {string} эмодзи-иконка
+ */
+function getCategoryIcon(categoryId) {
+  return CATEGORY_ICONS[categoryId] || "📦";
+}
 
-export default function TransactionList({ transactions = [], showDelete = false, onTransactionDeleted }) {
-  const [deletingId, setDeletingId] = useState(null);
-
-  const handleDelete = async (transaction) => {
-    if (!window.confirm('Вы уверены, что хотите удалить эту операцию?')) {
-      return;
-    }
-
-    setDeletingId(transaction.id);
-    
-    try {
-      let success = false;
-      
-      if (transaction.type === 'income') {
-        success = await deleteIncome(transaction.id);
-      } else {
-        success = await deleteExpense(transaction.id);
-      }
-
-      if (success) {
-        // Уведомляем родительский компонент об удалении
-        if (onTransactionDeleted) {
-          onTransactionDeleted(transaction.id);
-        }
-      } else {
-        alert('Не удалось удалить операцию');
-      }
-    } catch (error) {
-      console.error('Ошибка при удалении:', error);
-      alert('Произошла ошибка при удалении операции');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
+function TransactionList({ transactions, onEdit, onDelete }) {
+  // Если операций нет — показываем заглушку
   if (!transactions || transactions.length === 0) {
-    return <p className={styles.empty}>Операций не найдено</p>;
+    return (
+      <div className="animate-fade-in py-10 text-center text-secondary">
+        Операций пока нет
+      </div>
+    );
   }
 
   return (
-    <div className={styles.list}>
-      {transactions.map((transaction) => (
-        <div key={transaction.id} className={`${styles.item} ${styles[transaction.type]}`}>
-          <div className={styles.info}>
-            <div className={styles.category}>
-              {transaction.category}
-              {transaction.isRecurring && <span className={styles.recurring}>🔄</span>}
-            </div>
-            {transaction.comment && <div className={styles.comment}>{transaction.comment}</div>}
-            <div className={styles.date}>{formatDate(transaction.date)}</div>
-          </div>
-          
-          <div className={styles.actions}>
-            <div className={`${styles.amount} ${styles[transaction.type]}`}>
-              {formatAmount(transaction.amount, transaction.type)}
-            </div>
-            
-            {showDelete && (
-              <button
-                onClick={() => handleDelete(transaction)}
-                disabled={deletingId === transaction.id}
-                className={styles.deleteBtn}
-                title="Удалить"
+    <ul className="flex flex-col gap-3">
+      {(transactions || []).map((transaction, index) => {
+        const isIncome = transaction?.type === "income";
+        const categoryLabel = getCategoryLabel(
+          transaction?.category,
+          transaction?.type,
+        );
+        const categoryIcon = getCategoryIcon(transaction?.category);
+        const formattedAmount = formatTransactionAmount(
+          transaction?.amount,
+          transaction?.type,
+        );
+        const formattedDate = formatDate(transaction?.date);
+
+        return (
+          <li
+            key={transaction?.id}
+            style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+            className="animate-rise group flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card sm:p-4"
+          >
+            {/* Левая часть: иконка + название категории + дата */}
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span
+                className={`grid size-10 shrink-0 place-items-center rounded-xl text-xl transition-transform duration-300 group-hover:scale-110 sm:size-11 ${
+                  isIncome ? "bg-success-soft" : "bg-danger-soft"
+                }`}
               >
-                {deletingId === transaction.id ? '⏳' : '🗑️'}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+                {categoryIcon}
+              </span>
+
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold text-text sm:text-[0.95rem]">
+                  {categoryLabel}
+                </span>
+                <span className="text-xs text-secondary sm:text-sm">
+                  {formattedDate}
+                </span>
+              </div>
+            </div>
+
+            {/* Правая часть: сумма + кнопки действий */}
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={`text-sm font-bold tabular-nums transition-transform duration-300 group-hover:scale-105 sm:text-base ${
+                  isIncome ? "text-success" : "text-danger"
+                }`}
+              >
+                {formattedAmount}
+              </span>
+
+              <div className="flex gap-1 opacity-70 transition-opacity duration-300 group-hover:opacity-100">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(transaction)}
+                    title="Редактировать"
+                    aria-label="Редактировать операцию"
+                    className="grid size-8 place-items-center rounded-lg text-sm transition-all duration-200 hover:scale-110 hover:bg-surface-muted active:scale-95"
+                  >
+                    ✏️
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(transaction)}
+                    title="Удалить"
+                    aria-label="Удалить операцию"
+                    className="grid size-8 place-items-center rounded-lg text-sm transition-all duration-200 hover:scale-110 hover:bg-danger-soft active:scale-95"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
+
+export default TransactionList;

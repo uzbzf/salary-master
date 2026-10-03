@@ -1,43 +1,45 @@
 import { Router } from 'express';
-import {
-  getIncomes,
-  getIncome,
-  addIncome,
-  editIncome,
-  removeIncome,
-} from '../controllers/incomeController.js';
-import { validateTransaction, validatePagination } from '../middleware/validate.js';
+import * as incomeController from '../controllers/incomeController.js';
+import { validateTransactionMiddleware } from '../middleware/validate.js';
 
 const router = Router();
 
 /**
  * GET /api/v1/incomes
- * Получение списка всех доходов с фильтрами и пагинацией
+ * Получить все доходы с пагинацией и фильтрами
  */
-router.get('/', validatePagination, getIncomes);
+router.get('/', incomeController.getAllIncomes);
 
 /**
  * GET /api/v1/incomes/:id
- * Получение дохода по ID
+ * Получить доход по ID
  */
-router.get('/:id', getIncome);
+router.get('/:id', incomeController.getIncomeById);
 
 /**
  * POST /api/v1/incomes
- * Создание нового дохода
+ * Создать новый доход
  */
-router.post('/', validateTransaction('income'), addIncome);
+router.post(
+  '/',
+  validateTransactionMiddleware('income'),
+  incomeController.createIncome
+);
 
 /**
  * PUT /api/v1/incomes/:id
- * Обновление существующего дохода
+ * Обновить существующий доход
  */
-router.put('/:id', validateTransaction('income'), editIncome);
+router.put(
+  '/:id',
+  validateTransactionMiddleware('income'),
+  incomeController.updateIncome
+);
 
 /**
  * DELETE /api/v1/incomes/:id
- * Удаление дохода
+ * Удалить доход по ID
  */
-router.delete('/:id', removeIncome);
+router.delete('/:id', incomeController.deleteIncome);
 
 export default router;

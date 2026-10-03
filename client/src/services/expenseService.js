@@ -1,67 +1,57 @@
-import * as api from './api.js';
+import { get, post, put, del } from './api.js';
 
 /**
- * Получение списка всех расходов с опциональными фильтрами
- * @param {Object} filters - Объект фильтров (category, startDate, endDate, isRecurring, page, limit)
- * @returns {Promise<Object>} Объект с data (массив расходов) и pagination
+ * Получить все расходы с опциональными фильтрами
+ * @param {Object} filters - параметры фильтрации (page, limit, category, dateFrom, dateTo, isRecurring)
+ * @returns {Promise<Object>} { data: Array, pagination: { total, page, limit } }
  */
-export const getExpenses = async (filters = {}) => {
-  const result = await api.get('/expenses', filters);
+export async function getExpenses(filters = {}) {
+  const response = await get('/expenses', filters);
+  
+  // Адаптируем ответ backend под ожидаемый формат
   return {
-    data: result.data || [],
-    pagination: result.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 },
+    data: response.data || [],
+    pagination: {
+      total: response.total || 0,
+      page: response.page || 1,
+      limit: response.limit || 20,
+    },
   };
-};
+}
 
 /**
- * Получение расхода по ID
- * @param {string} id - Идентификатор расхода
- * @returns {Promise<Object|null>} Объект расхода или null
+ * Получить расход по ID
+ * @param {string} id - идентификатор расхода
+ * @returns {Promise<Object>} объект расхода
  */
-export const getExpenseById = async (id) => {
-  try {
-    const result = await api.get(`/expenses/${id}`);
-    return result.data;
-  } catch (error) {
-    if (error.code === 'NOT_FOUND') {
-      return null;
-    }
-    throw error;
-  }
-};
+export async function getExpenseById(id) {
+  return await get(`/expenses/${id}`);
+}
 
 /**
- * Создание нового расхода
- * @param {Object} expenseData - Данные расхода (amount, date, category, comment, isRecurring)
- * @returns {Promise<Object>} Созданный расход
+ * Добавить новый расход
+ * @param {Object} expenseData - данные расхода { amount, date, category, comment, isRecurring }
+ * @returns {Promise<Object>} созданный расход
  */
-export const addExpense = async (expenseData) => {
-  const result = await api.post('/expenses', expenseData);
-  return result.data;
-};
+export async function addExpense(expenseData) {
+  return await post('/expenses', expenseData);
+}
 
 /**
- * Обновление существующего расхода
- * @param {string} id - Идентификатор расхода
- * @param {Object} expenseData - Новые данные
- * @returns {Promise<Object>} Обновлённый расход
+ * Обновить существующий расход
+ * @param {string} id - идентификатор расхода
+ * @param {Object} expenseData - новые данные расхода
+ * @returns {Promise<Object>} обновлённый расход
  */
-export const updateExpense = async (id, expenseData) => {
-  const result = await api.put(`/expenses/${id}`, expenseData);
-  return result.data;
-};
+export async function updateExpense(id, expenseData) {
+  return await put(`/expenses/${id}`, expenseData);
+}
 
 /**
- * Удаление расхода
- * @param {string} id - Идентификатор расхода
- * @returns {Promise<boolean>} true, если удалён успешно
+ * Удалить расход по ID
+ * @param {string} id - идентификатор расхода
+ * @returns {Promise<void>}
  */
-export const deleteExpense = async (id) => {
-  try {
-    await api.del(`/expenses/${id}`);
-    return true;
-  } catch (error) {
-    console.error('Ошибка при удалении расхода:', error.message);
-    return false;
-  }
-};
+export async function deleteExpense(id) {
+  await del(`/expenses/${id}`);
+}

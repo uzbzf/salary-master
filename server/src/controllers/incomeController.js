@@ -1,126 +1,102 @@
-import {
-  getAllIncomes,
-  getIncomeById,
-  createIncome,
-  updateIncome,
-  deleteIncome,
-} from '../services/incomeService.js';
-import { createError } from '../middleware/errorHandler.js';
+import * as incomeService from '../services/incomeService.js';
 
 /**
- * Получение списка всех доходов с фильтрами и пагинацией
+ * Получить все доходы текущего пользователя
  * GET /api/v1/incomes
  */
-export const getIncomes = async (req, res, next) => {
+export async function getAllIncomes(req, res, next) {
   try {
-    const { category, startDate, endDate, page = 1, limit = 20 } = req.query;
-
-    const result = await getAllIncomes({
-      category,
-      startDate,
-      endDate,
-      page: Number(page),
-      limit: Number(limit),
-    });
-
-    res.json({
-      data: result.data,
-      pagination: result.pagination,
-    });
+    const userId = req.user.id;
+    const result = await incomeService.getAllIncomes(userId, req.query);
+    res.json(result);
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Получение дохода по ID
+ * Получить доход по ID (только если он принадлежит текущему пользователю)
  * GET /api/v1/incomes/:id
  */
-export const getIncome = async (req, res, next) => {
+export async function getIncomeById(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const income = await getIncomeById(id);
+
+    const income = await incomeService.getIncomeById(userId, id);
 
     if (!income) {
-      return next(createError('Доход не найден', 404, 'NOT_FOUND'));
+      const error = new Error('Доход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
     res.json({ data: income });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Создание нового дохода
+ * Создать новый доход для текущего пользователя
  * POST /api/v1/incomes
  */
-export const addIncome = async (req, res, next) => {
+export async function createIncome(req, res, next) {
   try {
-    const { amount, date, category, comment } = req.body;
+    const userId = req.user.id;
+    const income = await incomeService.createIncome(userId, req.body);
 
-    const newIncome = await createIncome({
-      amount,
-      date,
-      category,
-      comment,
-    });
-
-    res.status(201).json({
-      data: newIncome,
-      message: 'Доход успешно создан',
-    });
+    res.status(201).json({ data: income });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Обновление существующего дохода
+ * Обновить существующий доход (только если он принадлежит текущему пользователю)
  * PUT /api/v1/incomes/:id
  */
-export const editIncome = async (req, res, next) => {
+export async function updateIncome(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const { amount, date, category, comment } = req.body;
 
-    const updatedIncome = await updateIncome(id, {
-      amount,
-      date,
-      category,
-      comment,
-    });
+    const income = await incomeService.updateIncome(userId, id, req.body);
 
-    if (!updatedIncome) {
-      return next(createError('Доход не найден', 404, 'NOT_FOUND'));
+    if (!income) {
+      const error = new Error('Доход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
-    res.json({
-      data: updatedIncome,
-      message: 'Доход успешно обновлён',
-    });
+    res.json({ data: income });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Удаление дохода
+ * Удалить доход (только если он принадлежит текущему пользователю)
  * DELETE /api/v1/incomes/:id
  */
-export const removeIncome = async (req, res, next) => {
+export async function deleteIncome(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const success = await deleteIncome(id);
+
+    const success = await incomeService.deleteIncome(userId, id);
 
     if (!success) {
-      return next(createError('Доход не найден', 404, 'NOT_FOUND'));
+      const error = new Error('Доход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
-    res.json({
-      message: 'Доход успешно удалён',
-    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
-};
+}

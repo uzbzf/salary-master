@@ -1,20 +1,26 @@
 import React from "react";
-import styles from "./EmptyState.module.css";
 
 function EmptyState({
-  title = "Нет данных",
-  description = "Добавьте первую запись, чтобы начать работу",
+  title,
+  description,
   actionLabel,
   onAction,
-  icon = "📭",
+  icon = "📊",
 }) {
   return (
-    <div className={styles.emptyState}>
-      <div className={styles.icon}>{icon}</div>
-      <h3 className={styles.title}>{title}</h3>
-      <p className={styles.description}>{description}</p>
-      {actionLabel && onAction && (
-        <button className={styles.actionButton} onClick={onAction}>
+    <div className="animate-pop flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface px-6 py-12 text-center">
+      <span className="animate-float text-5xl">{icon}</span>
+
+      {title && (
+        <h3 className="text-lg font-semibold text-text">{title}</h3>
+      )}
+
+      {description && (
+        <p className="max-w-sm text-sm text-secondary">{description}</p>
+      )}
+
+      {actionLabel && (
+        <button type="button" className="btn btn-primary mt-1" onClick={onAction}>
           {actionLabel}
         </button>
       )}

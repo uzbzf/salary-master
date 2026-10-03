@@ -1,93 +1,93 @@
-import { INCOME_CATEGORY_IDS, EXPENSE_CATEGORY_IDS } from '../utils/categories.js';
-import { createError } from './errorHandler.js';
+import { getIncomeCategoryIds, getExpenseCategoryIds } from '../utils/categories.js';
 
 /**
- * Middleware для валидации данных транзакции
- * @param {string} type - Тип транзакции ('income' или 'expense')
+ * Валидация данных операции (доход или расход)
+ * @param {Object} data - данные для валидации
+ * @param {string} type - тип операции ('income' или 'expense')
+ * @returns {Object} объект с результатом { valid: boolean, errors: Array<string> }
+ */
+export function validateTransaction(data, type = 'expense') {
+  const errors = [];
+
+  // Проверка amount
+  if (data.amount === undefined || data.amount === null) {
+    errors.push('Поле amount обязательно');
+  } else if (typeof data.amount !== 'number' || data.amount <= 0) {
+    errors.push('Поле amount должно быть положительным числом');
+  }
+
+  // Проверка date
+  if (!data.date) {
+    errors.push('Поле date обязательно');
+  } else if (!isValidDate(data.date)) {
+    errors.push('Поле date должно быть в формате YYYY-MM-DD');
+  }
+
+  // Проверка category
+  if (!data.category) {
+    errors.push('Поле category обязательно');
+  } else {
+    const validCategories = type === 'income'
+      ? getIncomeCategoryIds()
+      : getExpenseCategoryIds();
+
+    if (!validCategories.includes(data.category)) {
+      errors.push(`Недопустимая категория: ${data.category}`);
+    }
+  }
+
+  // Проверка comment (необязательное поле, но если есть - должно быть строкой)
+  if (data.comment !== undefined && data.comment !== null && typeof data.comment !== 'string') {
+    errors.push('Поле comment должно быть строкой');
+  }
+
+  // Проверка is_recurring (только для расходов)
+  if (type === 'expense' && data.is_recurring !== undefined) {
+    if (typeof data.is_recurring !== 'boolean' && data.is_recurring !== 0 && data.is_recurring !== 1) {
+      errors.push('Поле is_recurring должно быть boolean или 0/1');
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors: errors,
+  };
+}
+
+/**
+ * Проверка корректности даты в формате YYYY-MM-DD
+ * @param {string} dateString - строка даты
+ * @returns {boolean} true, если дата корректна
+ */
+function isValidDate(dateString) {
+  // Регулярное выражение для формата YYYY-MM-DD
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!dateRegex.test(dateString)) {
+    return false;
+  }
+
+  // Проверяем, что дата реально существует
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date);
+}
+
+/**
+ * Middleware для валидации тела запроса
+ * @param {string} type - тип операции ('income' или 'expense')
  * @returns {Function} Express middleware
  */
-export const validateTransaction = (type) => {
+export function validateTransactionMiddleware(type = 'expense') {
   return (req, res, next) => {
-    const { amount, date, category, comment } = req.body;
+    const validation = validateTransaction(req.body, type);
 
-    // Проверка обязательных полей
-    if (amount === undefined || amount === null) {
-      return next(createError('Поле amount обязательно', 400, 'VALIDATION_ERROR'));
+    if (!validation.valid) {
+      const error = new Error('Ошибка валидации: ' + validation.errors.join(', '));
+      error.statusCode = 400;
+      error.code = 'VALIDATION_ERROR';
+      return next(error);
     }
 
-    if (!date) {
-      return next(createError('Поле date обязательно', 400, 'VALIDATION_ERROR'));
-    }
-
-    if (!category) {
-      return next(createError('Поле category обязательно', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Проверка типа amount
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      return next(createError('Поле amount должно быть числом', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Проверка amount > 0
-    if (amount <= 0) {
-      return next(createError('Поле amount должно быть больше 0', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Проверка формата даты (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-      return next(createError('Поле date должно быть в формате YYYY-MM-DD', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Проверка валидности даты
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
-      return next(createError('Некорректная дата', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Проверка категории
-    const validCategories = type === 'income' ? INCOME_CATEGORY_IDS : EXPENSE_CATEGORY_IDS;
-    if (!validCategories.includes(category)) {
-      return next(
-        createError(
-          `Некорректная категория. Допустимые значения: ${validCategories.join(', ')}`,
-          400,
-          'VALIDATION_ERROR'
-        )
-      );
-    }
-
-    // Проверка comment (если передан)
-    if (comment !== undefined && typeof comment !== 'string') {
-      return next(createError('Поле comment должно быть строкой', 400, 'VALIDATION_ERROR'));
-    }
-
-    // Всё валидно — передаём управление дальше
     next();
   };
-};
-
-/**
- * Middleware для валидации параметров пагинации
- */
-export const validatePagination = (req, res, next) => {
-  const { page, limit } = req.query;
-
-  if (page !== undefined) {
-    const pageNum = parseInt(page);
-    if (isNaN(pageNum) || pageNum < 1) {
-      return next(createError('Параметр page должен быть положительным числом', 400, 'VALIDATION_ERROR'));
-    }
-    req.query.page = pageNum;
-  }
-
-  if (limit !== undefined) {
-    const limitNum = parseInt(limit);
-    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
-      return next(createError('Параметр limit должен быть числом от 1 до 100', 400, 'VALIDATION_ERROR'));
-    }
-    req.query.limit = limitNum;
-  }
-
-  next();
-};
+}

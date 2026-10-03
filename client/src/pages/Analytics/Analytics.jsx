@@ -1,106 +1,98 @@
-import { useState, useEffect } from 'react';
-import { getBalance, getByCategory, getMonthlySummary } from '../../services/summaryService.js';
+import React, { useState, useEffect } from "react";
+import PieChart from "../../components/PieChart/PieChart";
+import BarChart from "../../components/BarChart/BarChart";
+import { getByCategory, getMonthlySummary } from "../../services/summaryService";
 
-// Вспомогательная функция для форматирования валюты
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(amount);
-};
+function Analytics() {
+  // Состояние для выбора периода в круговой диаграмме
+  const [period, setPeriod] = useState("all");
 
-export default function Analytics() {
-  const [balance, setBalance] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
-  const [categoryData, setCategoryData] = useState([]);
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Состояние данных для графиков
+  const [pieChartData, setPieChartData] = useState([]);
+  const [barChartData, setBarChartData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Функция загрузки данных
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+
+      // Параллельно загружаем данные для обоих графиков
+      const [categoryData, monthlyData] = await Promise.all([
+        getByCategory("expense", period),
+        getMonthlySummary(6),
+      ]);
+
+      // Гарантируем, что в состояниях всегда массивы
+      setPieChartData(Array.isArray(categoryData) ? categoryData : []);
+      setBarChartData(Array.isArray(monthlyData) ? monthlyData : []);
+    } catch (error) {
+      console.error("Ошибка загрузки аналитики:", error);
+      alert("Не удалось загрузить данные аналитики. Проверьте, запущен ли сервер.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Загрузка данных при монтировании и изменении периода
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Загружаем все сводные данные параллельно
-        const [balanceRes, categoryRes, monthlyRes] = await Promise.all([
-          getBalance(),
-          getByCategory('expense'), // По умолчанию показываем расходы
-          getMonthlySummary(6)      // Последние 6 месяцев
-        ]);
-        
-        setBalance(balanceRes);
-        setCategoryData(categoryRes);
-        setMonthlyData(monthlyRes);
-      } catch (error) {
-        console.error('Ошибка загрузки аналитики:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+    loadData();
+  }, [period]);
 
-  if (loading) {
-    return <div className="p-8 text-center text-gray-500">Загрузка аналитики...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-secondary">
+        <span className="size-9 animate-spin rounded-full border-[3px] border-border border-t-primary" />
+        <p className="animate-shimmer text-sm">Загрузка аналитики...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="p-4 space-y-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold">Аналитика</h1>
+    <div className="flex flex-col gap-6">
+      <h1 className="page-title">Аналитика</h1>
 
-      {/* Карточки общего баланса */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Общий баланс</p>
-          <p className={`text-2xl font-bold ${balance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(balance.balance)}
-          </p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Всего доходов</p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(balance.totalIncome)}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Всего расходов</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(balance.totalExpense)}</p>
-        </div>
-      </div>
+      {/* Сетка графиков */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Круговая диаграмма расходов по категориям */}
+        <section className="card animate-rise p-5 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold tracking-tight text-text">
+              Расходы по категориям
+            </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Распределение по категориям */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">Расходы по категориям</h2>
-          {categoryData.length > 0 ? (
-            <ul className="space-y-3">
-              {categoryData.map((item) => (
-                <li key={item.categoryId} className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">{item.categoryLabel}</span>
-                  <span className="font-medium">{formatCurrency(item.total)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-500 text-center py-4">Нет данных о расходах</p>
-          )}
-        </div>
+            {/* Селектор периода */}
+            <select
+              className="field w-auto cursor-pointer py-2 pr-8 text-sm"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              aria-label="Период"
+            >
+              <option value="all">Всё время</option>
+              <option value="today">Сегодня</option>
+              <option value="week">Неделя</option>
+              <option value="month">Месяц</option>
+              <option value="year">Год</option>
+            </select>
+          </div>
 
-        {/* Помесячная динамика */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">Динамика за последние 6 месяцев</h2>
-          {monthlyData.length > 0 ? (
-            <div className="space-y-4">
-              {monthlyData.map((item) => {
-                const monthName = new Date(item.year, item.month - 1).toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
-                return (
-                  <div key={`${item.year}-${item.month}`} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
-                    <p className="font-medium capitalize">{monthName}</p>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-green-600">+{formatCurrency(item.income)}</span>
-                      <span className="text-red-600">-{formatCurrency(item.expense)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">Нет данных за выбранный период</p>
-          )}
-        </div>
+          <PieChart data={pieChartData} />
+        </section>
+
+        {/* Столбчатый график доходов/расходов по месяцам */}
+        <section
+          className="card animate-rise p-5 sm:p-6"
+          style={{ animationDelay: "90ms" }}
+        >
+          <h2 className="mb-4 text-lg font-bold tracking-tight text-text">
+            Доходы и расходы по месяцам
+          </h2>
+
+          <BarChart data={barChartData} />
+        </section>
       </div>
     </div>
   );
 }
+
+export default Analytics;

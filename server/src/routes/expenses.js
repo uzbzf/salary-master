@@ -1,43 +1,45 @@
 import { Router } from 'express';
-import {
-  getExpenses,
-  getExpense,
-  addExpense,
-  editExpense,
-  removeExpense,
-} from '../controllers/expenseController.js';
-import { validateTransaction, validatePagination } from '../middleware/validate.js';
+import * as expenseController from '../controllers/expenseController.js';
+import { validateTransactionMiddleware } from '../middleware/validate.js';
 
 const router = Router();
 
 /**
  * GET /api/v1/expenses
- * Получение списка всех расходов с фильтрами и пагинацией
+ * Получить все расходы с пагинацией и фильтрами
  */
-router.get('/', validatePagination, getExpenses);
+router.get('/', expenseController.getAllExpenses);
 
 /**
  * GET /api/v1/expenses/:id
- * Получение расхода по ID
+ * Получить расход по ID
  */
-router.get('/:id', getExpense);
+router.get('/:id', expenseController.getExpenseById);
 
 /**
  * POST /api/v1/expenses
- * Создание нового расхода
+ * Создать новый расход
  */
-router.post('/', validateTransaction('expense'), addExpense);
+router.post(
+  '/',
+  validateTransactionMiddleware('expense'),
+  expenseController.createExpense
+);
 
 /**
  * PUT /api/v1/expenses/:id
- * Обновление существующего расхода
+ * Обновить существующий расход
  */
-router.put('/:id', validateTransaction('expense'), editExpense);
+router.put(
+  '/:id',
+  validateTransactionMiddleware('expense'),
+  expenseController.updateExpense
+);
 
 /**
  * DELETE /api/v1/expenses/:id
- * Удаление расхода
+ * Удалить расход по ID
  */
-router.delete('/:id', removeExpense);
+router.delete('/:id', expenseController.deleteExpense);
 
 export default router;

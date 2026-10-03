@@ -1,129 +1,102 @@
-import {
-  getAllExpenses,
-  getExpenseById,
-  createExpense,
-  updateExpense,
-  deleteExpense,
-} from '../services/expenseService.js';
-import { createError } from '../middleware/errorHandler.js';
+import * as expenseService from '../services/expenseService.js';
 
 /**
- * Получение списка всех расходов с фильтрами и пагинацией
+ * Получить все расходы текущего пользователя
  * GET /api/v1/expenses
  */
-export const getExpenses = async (req, res, next) => {
+export async function getAllExpenses(req, res, next) {
   try {
-    const { category, startDate, endDate, isRecurring, page = 1, limit = 20 } = req.query;
-
-    const result = await getAllExpenses({
-      category,
-      startDate,
-      endDate,
-      isRecurring: isRecurring !== undefined ? isRecurring === 'true' : undefined,
-      page: Number(page),
-      limit: Number(limit),
-    });
-
-    res.json({
-      data: result.data,
-      pagination: result.pagination,
-    });
+    const userId = req.user.id;
+    const result = await expenseService.getAllExpenses(userId, req.query);
+    res.json(result);
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Получение расхода по ID
+ * Получить расход по ID (только если он принадлежит текущему пользователю)
  * GET /api/v1/expenses/:id
  */
-export const getExpense = async (req, res, next) => {
+export async function getExpenseById(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const expense = await getExpenseById(id);
+
+    const expense = await expenseService.getExpenseById(userId, id);
 
     if (!expense) {
-      return next(createError('Расход не найден', 404, 'NOT_FOUND'));
+      const error = new Error('Расход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
     res.json({ data: expense });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Создание нового расхода
+ * Создать новый расход для текущего пользователя
  * POST /api/v1/expenses
  */
-export const addExpense = async (req, res, next) => {
+export async function createExpense(req, res, next) {
   try {
-    const { amount, date, category, comment, isRecurring } = req.body;
+    const userId = req.user.id;
+    const expense = await expenseService.createExpense(userId, req.body);
 
-    const newExpense = await createExpense({
-      amount,
-      date,
-      category,
-      comment,
-      isRecurring,
-    });
-
-    res.status(201).json({
-      data: newExpense,
-      message: 'Расход успешно создан',
-    });
+    res.status(201).json({ data: expense });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Обновление существующего расхода
+ * Обновить существующий расход (только если он принадлежит текущему пользователю)
  * PUT /api/v1/expenses/:id
  */
-export const editExpense = async (req, res, next) => {
+export async function updateExpense(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const { amount, date, category, comment, isRecurring } = req.body;
 
-    const updatedExpense = await updateExpense(id, {
-      amount,
-      date,
-      category,
-      comment,
-      isRecurring,
-    });
+    const expense = await expenseService.updateExpense(userId, id, req.body);
 
-    if (!updatedExpense) {
-      return next(createError('Расход не найден', 404, 'NOT_FOUND'));
+    if (!expense) {
+      const error = new Error('Расход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
-    res.json({
-      data: updatedExpense,
-      message: 'Расход успешно обновлён',
-    });
+    res.json({ data: expense });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Удаление расхода
+ * Удалить расход (только если он принадлежит текущему пользователю)
  * DELETE /api/v1/expenses/:id
  */
-export const removeExpense = async (req, res, next) => {
+export async function deleteExpense(req, res, next) {
   try {
+    const userId = req.user.id;
     const { id } = req.params;
-    const success = await deleteExpense(id);
+
+    const success = await expenseService.deleteExpense(userId, id);
 
     if (!success) {
-      return next(createError('Расход не найден', 404, 'NOT_FOUND'));
+      const error = new Error('Расход не найден');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      throw error;
     }
 
-    res.json({
-      message: 'Расход успешно удалён',
-    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
-};
+}

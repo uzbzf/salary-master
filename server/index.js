@@ -1,40 +1,27 @@
 import app from './src/app.js';
-import { config } from './src/config/index.js';
-import { initializeDatabase } from './src/db/connection.js';
+import { initDb } from './src/db/connection.js';
+import { PORT } from './src/config/index.js';
 
-const PORT = config.port;
-
-// Функция запуска сервера
-const startServer = async () => {
+/**
+ * Точка входа в приложение
+ * Асинхронно инициализирует БД, затем запускает сервер
+ */
+async function startServer() {
   try {
-    // Дожидаемся инициализации JSON-базы данных
-    await initializeDatabase();
-    
-    // Запускаем сервер
+    // 1. Сначала инициализируем базу данных и создаём таблицы
+    await initDb();
+    console.log('✅ База данных успешно инициализирована');
+
+    // 2. Только после этого запускаем Express-сервер
     app.listen(PORT, () => {
-      console.log('🚀 ==================================');
-      console.log(`✅ Salary Tracker API запущен`);
-      console.log(`📍 Порт: ${PORT}`);
-      console.log(`🌐 URL: http://localhost:${PORT}`);
-      console.log(`📚 API: http://localhost:${PORT}/api/v1`);
-      console.log('🚀 ==================================');
+      console.log(`🚀 Сервер запущен на порту ${PORT}`);
+      console.log(`📡 API доступен по адресу: http://localhost:${PORT}/api/v1`);
+      console.log(`💚 Health check: http://localhost:${PORT}/health`);
     });
   } catch (error) {
-    console.error('❌ Ошибка при запуске сервера:', error);
-    process.exit(1);
+    console.error('❌ Критическая ошибка при запуске сервера:', error);
+    process.exit(1); // Завершаем процесс с кодом ошибки
   }
-};
+}
 
-// Запускаем сервер
 startServer();
-
-// Обработка необработанных исключений
-process.on('uncaughtException', (error) => {
-  console.error('❌ Необработанное исключение:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Необработанный отказ промиса:', reason);
-  process.exit(1);
-});
