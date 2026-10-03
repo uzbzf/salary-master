@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Переменные окружения (TURSO_AUTH_TOKEN, JWT_SECRET) — никогда в Git
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
